@@ -38,6 +38,8 @@ void* operator new(std::size_t sz) // no inline, required by [replacement.functi
 }
 void operator delete(void* ptr) noexcept
 {
+    if (!ptr) return;
+
     if (g_is_test_allocator_enabled) {
         g_active_allocations--;
 

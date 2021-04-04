@@ -13,9 +13,9 @@
 using string = simple::string;
 
 #ifdef DEBUG
-#define SKIP_ALLOCATIONS_TEST 1
+#define SKIP_ALLOCATIONS_TEST 0
 #else
-#define SKIP_ALLOCATIONS_TEST 1
+#define SKIP_ALLOCATIONS_TEST 0
 #endif // DEBUG
 
 // test for short string optimization
@@ -190,7 +190,7 @@ TEST(string, default_string_allocations) {
 }
 
 TEST(string, short_string_allocations) {
-    if (SKIP_ALLOCATIONS_TEST) return;
+    if (SKIP_ALLOCATIONS_TEST || !has_sso) return;
 
     allocations_recorder memory;
     {
@@ -219,8 +219,29 @@ TEST(string, long_string_allocations) {
     EXPECT_EQ(memory.active_used_memory(), 0u);
 }
 
-TEST(string, copy_constructor_allocations) {
+TEST(string, copy_constructor_allocations_no_sso) {
     if (SKIP_ALLOCATIONS_TEST) return;
+
+    allocations_recorder memory;
+    size_t used_capacity;
+    {
+        string empty_string;
+        string long_string("loooooooooooooooooooooong string");
+
+        string empty_string_copy(empty_string);
+        string long_string_copy(long_string);
+
+        used_capacity = long_string_copy.capacity();
+    }
+    memory.stop();
+    EXPECT_EQ(memory.total_allocations(), 2u);
+    EXPECT_EQ(memory.total_used_memory(), 2 * (used_capacity + 1));
+    EXPECT_EQ(memory.active_allocations(), 0u);
+    EXPECT_EQ(memory.active_used_memory(), 0u);
+}
+
+TEST(string, copy_constructor_allocations) {
+    if (SKIP_ALLOCATIONS_TEST || !has_sso) return;
 
     allocations_recorder memory;
     size_t used_capacity;
@@ -242,8 +263,29 @@ TEST(string, copy_constructor_allocations) {
     EXPECT_EQ(memory.active_used_memory(), 0u);
 }
 
-TEST(string, move_constructor_allocations) {
+TEST(string, move_constructor_allocations_no_sso) {
     if (SKIP_ALLOCATIONS_TEST) return;
+
+    allocations_recorder memory;
+    size_t used_capacity;
+    {
+        string empty_string;
+        string long_string("loooooooooooooooooooooong string");
+
+        string empty_string_copy(std::move(empty_string));
+        string long_string_copy(std::move(long_string));
+
+        used_capacity = long_string_copy.capacity();
+    }
+    memory.stop();
+    EXPECT_EQ(memory.total_allocations(), 1u);
+    EXPECT_EQ(memory.total_used_memory(), used_capacity + 1u);
+    EXPECT_EQ(memory.active_allocations(), 0u);
+    EXPECT_EQ(memory.active_used_memory(), 0u);
+}
+
+TEST(string, move_constructor_allocations) {
+    if (SKIP_ALLOCATIONS_TEST || !has_sso) return;
 
     allocations_recorder memory;
     size_t used_capacity;
