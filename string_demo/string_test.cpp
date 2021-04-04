@@ -5,12 +5,14 @@
 
 #include "string_api.h"
 #include "simple_string.h"
+#include "sso_string.h"
 
 #include "test_allocator.h"
 
 //using string = api_only::string;
 //using string = std::string;
-using string = simple::string;
+//using string = simple::string;
+using string = sso::string;
 
 #ifdef DEBUG
 #define SKIP_ALLOCATIONS_TEST 0
@@ -74,13 +76,11 @@ TEST(string, move_constructor) {
     string long_string_copy(std::move(long_string));
 
     EXPECT_STREQ(empty_string.c_str(), "");
-    EXPECT_STREQ(short_string.c_str(), "");
     EXPECT_STREQ(long_string.c_str(), "");
     EXPECT_STREQ(empty_string_copy.c_str(), "");
     EXPECT_STREQ(short_string_copy.c_str(), "short string");
     EXPECT_STREQ(long_string_copy.c_str(), "loooooooooooooooooooooong string");
     EXPECT_EQ(empty_string.size(), 0u);
-    EXPECT_EQ(short_string.size(), 0u);
     EXPECT_EQ(long_string.size(), 0u);
     EXPECT_EQ(empty_string_copy.size(), 0u);
     EXPECT_EQ(short_string_copy.size(), 12u);
@@ -141,13 +141,11 @@ TEST(string, move_assignment) {
     long_string_copy = std::move(long_string);
 
     EXPECT_STREQ(empty_string.c_str(), "");
-    EXPECT_STREQ(short_string.c_str(), "");
     EXPECT_STREQ(long_string.c_str(), "");
     EXPECT_STREQ(empty_string_copy.c_str(), "");
     EXPECT_STREQ(short_string_copy.c_str(), "short string");
     EXPECT_STREQ(long_string_copy.c_str(), "loooooooooooooooooooooong string");
     EXPECT_EQ(empty_string.size(), 0u);
-    EXPECT_EQ(short_string.size(), 0u);
     EXPECT_EQ(long_string.size(), 0u);
     EXPECT_EQ(empty_string_copy.size(), 0u);
     EXPECT_EQ(short_string_copy.size(), 12u);
@@ -328,9 +326,17 @@ TEST(string, insert) {
 }
 
 TEST(string, insert_self) {
-    string str("0123456789");
-    str.insert(3, str.c_str() + 6);
-    EXPECT_STREQ(str.c_str(), "01267893456789");
+    string str("01234");
+    str.reserve(16);
+    str.insert(3, str.c_str() + 1);
+    EXPECT_STREQ(str.c_str(), "012123434");
+}
+
+TEST(string, insert_self_2) {
+    string str("01234");
+    str.reserve(16);
+    str.insert(1, str.c_str() + 3);
+    EXPECT_STREQ(str.c_str(), "0341234");
 }
 
 TEST(string, insert_allocations) {

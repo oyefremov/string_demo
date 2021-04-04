@@ -3,11 +3,16 @@
 #include <cstring>
 #include <utility>
 
-namespace simple {
+namespace sso {
     class string {
-        char* _data = nullptr;
+
+        enum { SSO_BUFFER_SIZE = 16 };
+
+        char* _data = _buffer;
         size_t _size = 0;
-        size_t _capacity = 0;
+        size_t _capacity = SSO_BUFFER_SIZE - 1;
+        char _buffer[SSO_BUFFER_SIZE] = { 0 };
+        bool _use_heap = false;
 
         size_t calc_capacity(size_t required_size) const {
             if (required_size <= _capacity) return _capacity;
@@ -24,79 +29,109 @@ namespace simple {
         // construct from c-string
         string(const char* str) {
             _size = std::strlen(str);
-            if (_size) {
+            if (_size > _capacity) {
                 _capacity = _size;
                 _data = new char[_capacity + 1];
-                std::memcpy(_data, str, _size + 1);
+                _use_heap = true;
             }
+            std::memcpy(_data, str, _size + 1);
         }
 
         // rule of five
         string(const string& other) {
-            if (other.size() > 0) {
-                _size = other._size;
+            _size = other._size;
+            if (_size > _capacity) {
                 _capacity = _size;
                 _data = new char[_capacity + 1];
-                std::memcpy(_data, other._data, _size + 1);
+                _use_heap = true;
             }
-            else {
-                _data = nullptr;
-                _size = 0;
-                _capacity = 0;
-            }
+            std::memcpy(_data, other._data, _size + 1);
         }
 
         string(string&& other) noexcept {
-            _size = other._size;
-            _capacity = other._capacity;
-            _data = other._data;
+            if (other._use_heap) {
+                _size = other._size;
+                _capacity = other._capacity;
+                _data = other._data;
+                _use_heap = true;
 
-            other._size = 0;
-            other._capacity = 0;
-            other._data = nullptr;
+                other._size = 0;
+                other._capacity = SSO_BUFFER_SIZE - 1;
+                other._data = other._buffer;
+                other._buffer[0] = 0;
+                other._use_heap = false;
+            }
+            else {
+                _size = other._size;
+                std::memcpy(_buffer, other._buffer, other._size + 1);
+            }
         }
 
         string& operator=(const string& other) {
             if (other._size > _capacity) {
-                delete[] _data;
-                _size = other._size;
-                _capacity = _size;
-                _data = new char[_capacity + 1];
-                std::memcpy(_data, other._data, _size + 1);
-            }
-            else if (other._size > 0) {
-                _size = other._size;
-                std::memcpy(_data, other._data, _size + 1);
-            }
-            else {
-                if (_data) {
-                    _size = 0;
-                    _data[0] = 0;
+                if (_use_heap) {
+                    delete[] _data;
                 }
+                _capacity = other._size;
+                _data = new char[_capacity + 1];
+                _use_heap = true;
             }
+            _size = other._size;
+            std::memcpy(_data, other._data, _size + 1);
             return *this;
         }
         string& operator=(string&& other) noexcept {
-            delete[] _data;
+            if (this->_use_heap) {
+                delete[] _data;
+            }
 
             _size = other._size;
             _capacity = other._capacity;
-            _data = other._data;
+            if (other._use_heap) {
+                _data = other._data;
+                _use_heap = true;
 
-            other._size = 0;
-            other._capacity = 0;
-            other._data = nullptr;
+                other._size = 0;
+                other._capacity = SSO_BUFFER_SIZE - 1;
+                other._data = other._buffer;
+                other._buffer[0] = 0;
+                other._use_heap = false;
+            }
+            else {
+                _data = _buffer;
+                _use_heap = false;
+                std::memcpy(_buffer, other._buffer, other._size + 1);
+            }
 
             return *this;
         }
 
         ~string() noexcept {
-            delete[] _data;
+            if (_use_heap) {
+                delete[] _data;
+            }
         }
 
         // useful and interesting
         void swap(string& other) noexcept {
-            std::swap(this->_data, other._data);
+            if (this->_use_heap && other._use_heap) {
+                std::swap(this->_data, other._data);
+            }
+            else if (!this->_use_heap && !other._use_heap) {
+                std::swap(this->_buffer, other._buffer);
+            }
+            else if (this->_use_heap && !other._use_heap) {
+                other._data = this->_data;
+                this->_data = this->_buffer;
+                std::memcpy(this->_buffer, other._buffer, other._size + 1);
+            }
+            else if (!this->_use_heap && other._use_heap) {
+                this->_data = other._data;
+                other._data = other._buffer;
+                std::memcpy(other._buffer, this->_buffer, this->_size + 1);
+            }
+
+            std::swap(this->_use_heap, other._use_heap);
             std::swap(this->_size, other._size);
             std::swap(this->_capacity, other._capacity);
         }
@@ -117,7 +152,10 @@ namespace simple {
                 std::memcpy(new_data, _data, index);
                 std::memset(new_data + index, ch, count);
                 std::memcpy(new_data + _size, _data + index, _size + 1 - index);
-                delete _data;
+                if (_use_heap) {
+                    delete _data;
+                }
+                _use_heap = true;
                 _data = new_data;
                 _size += count;
             }
@@ -136,12 +174,16 @@ namespace simple {
                 std::memcpy(new_data + index, str, count);
                 std::memcpy(new_data + index + count, _data + index, _size - index);
                 new_data[_size + count] = 0;
-                delete _data;
+                if (_use_heap) {
+                    delete _data;
+                }
+                _use_heap = true;
                 _data = new_data;
                 _size += count;
             }
-            else if (_data) {
+            else {
                 std::memmove(_data + index + count, _data + index, _size + 1 - index);
+
                 if (str + count >= _data + index && str + count <= _data + _size) {
                     // some data pointed by str was moved with memmove
                     if (str < _data + index) {
@@ -163,7 +205,7 @@ namespace simple {
 
         // for printing
         const char* c_str() const noexcept {
-            return _data ? _data : "";
+            return _data;
         }
 
         size_t size() const noexcept {
@@ -173,7 +215,10 @@ namespace simple {
             if (_capacity < new_size) {
                 auto new_data = new char[new_size + 1];
                 std::memcpy(new_data, _data, _size);
-                delete _data;
+                if (_use_heap) {
+                    delete _data;
+                }
+                _use_heap = true;
                 _data = new_data;
                 std::memset(_data + _size, ch, new_size - _size);
                 _data[new_size] = 0;
@@ -199,7 +244,10 @@ namespace simple {
                 auto new_data = new char[new_capacity + 1];
                 std::memcpy(new_data, _data, _size);
                 new_data[_size] = 0;
-                delete _data;
+                if (_use_heap) {
+                    delete _data;
+                }
+                _use_heap = true;
                 _data = new_data;
                 _capacity = new_capacity;
             }
