@@ -53,5 +53,8 @@
     <ClInclude Include="sso_string.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="sso_string2.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -6,13 +6,15 @@
 #include "string_api.h"
 #include "simple_string.h"
 #include "sso_string.h"
+#include "sso_string2.h"
 
 #include "test_allocator.h"
 
 //using string = api_only::string;
 //using string = std::string;
 //using string = simple::string;
-using string = sso::string;
+//using string = sso::string;
+using string = sso2::string;
 
 #ifdef DEBUG
 #define SKIP_ALLOCATIONS_TEST 0
