@@ -3,12 +3,24 @@
 #include <cstring>
 #include <utility>
 
-namespace sso2 {
+namespace sso3 {
+
+    const size_t USE_HEAP_BIT = (size_t)1 << (sizeof(size_t) * 8 - 1);
+    const size_t CAPACITY_MASK = ~USE_HEAP_BIT;
 
     struct heap_string_data {
         char* _data;
         size_t _size;
-        size_t _capacity;
+        size_t _capacity_and_heap_flag;
+        size_t capacity() const {
+            return _capacity_and_heap_flag & CAPACITY_MASK;
+        }
+        bool use_heap() const {
+            return _capacity_and_heap_flag & USE_HEAP_BIT;
+        }
+        void set_capacity_and_heap_flag(size_t capacity) {
+            _capacity_and_heap_flag = capacity | USE_HEAP_BIT;
+        }
     };
 
     static_assert(
@@ -24,7 +36,17 @@ namespace sso2 {
 
     struct small_string_data {
         char _buffer[SSO_BUFFER_SIZE];
-        char _size;
+        char _size_and_heap_flag;
+        size_t size() const {
+            return _size_and_heap_flag;
+        }
+        bool use_heap() const {
+            return _size_and_heap_flag & 128;
+        }
+        void set_size_and_reset_heap_flag(size_t size) {
+            assert(size <= SSO_CAPACITY);
+            _size_and_heap_flag = size;
+        }
     };
 
     class string {
@@ -34,7 +56,34 @@ namespace sso2 {
             small_string_data _small;
             heap_string_data _heap;
         };
-        bool _use_heap;
+        bool use_heap() const {
+            return _small.use_heap();
+        }
+
+        void set_heap_data(const heap_string_data& src) {
+            _heap = src;
+        }
+
+        void set_heap_data(size_t size, size_t capacity, char* data) {
+            _heap._size = size;
+            _heap._data = data;
+            _heap.set_capacity_and_heap_flag(capacity);
+        }
+
+        void set_small_data(const small_string_data& src) {
+            _small = src;
+        }
+
+        void set_small_data(size_t size, const char* src) {
+            std::memcpy(_small._buffer, src, size + 1);
+            assert(size <= SSO_CAPACITY);
+            _small.set_size_and_reset_heap_flag(size);
+        }
+
+        void clear_small_data() {
+            _small._buffer[0] = 0;
+            _small.set_size_and_reset_heap_flag(0);
+        }
 
         size_t calc_capacity(size_t required_size) const {
             if (required_size <= capacity()) return capacity();
@@ -46,138 +95,112 @@ namespace sso2 {
         }
 
         char* data() noexcept {
-            return _use_heap ? _heap._data : _small._buffer;
+            return use_heap() ? _heap._data : _small._buffer;
         }
 
         const char* data() const noexcept {
-            return _use_heap ? _heap._data : _small._buffer;
+            return use_heap() ? _heap._data : _small._buffer;
         }
 
     public:
         // default constructed
         string() noexcept {
-            _small._size = 0;
-            _small._buffer[0] = 0;
-            _use_heap = false;
+            clear_small_data();
         }
 
         // construct from c-string
         string(const char* str) {
             auto new_size = std::strlen(str);
             if (new_size > SSO_CAPACITY) {
-                _heap._size = new_size;
-                _heap._capacity = new_size;
-                _heap._data = new char[new_size + 1];
-                std::memcpy(_heap._data, str, new_size + 1);
-                _use_heap = true;
+                auto new_data = new char[new_size + 1];
+                std::memcpy(new_data, str, new_size + 1);
+                set_heap_data(new_size, new_size, new_data);
             }
             else {
-                _small._size = (char)new_size;
-                std::memcpy(_small._buffer, str, new_size + 1);
-                _use_heap = false;
+                set_small_data(new_size, str);
             }
         }
 
         string(const string& other) {
             auto new_size = other.size();
             if (new_size > SSO_CAPACITY) {
-                _heap._size = new_size;
-                _heap._capacity = new_size;
-                _heap._data = new char[new_size + 1];
-                std::memcpy(_heap._data, other.data(), new_size + 1);
-                _use_heap = true;
+                auto new_data = new char[new_size + 1];
+                std::memcpy(new_data, other.data(), new_size + 1);
+                set_heap_data(new_size, new_size, new_data);
             }
             else {
-                _small._size = (char)new_size;
-                std::memcpy(_small._buffer, other.data(), new_size + 1);
-                _use_heap = false;
+                set_small_data(new_size, other.data());
             }
         }
 
         string(string&& other) noexcept {
-            if (other._use_heap) {
-                _heap = other._heap;
-                _use_heap = true;
-
-                other._small._size = 0;
-                other._small._buffer[0] = 0;
-                other._use_heap = false;
+            if (other.use_heap()) {
+                set_heap_data(other._heap);
+                other.clear_small_data();
             }
             else {
-                _small = other._small;
-                _use_heap = false;
+                set_small_data(other._small);
             }
         }
 
         string& operator=(const string& other) {
             auto new_size = other.size();
             if (new_size > capacity()) {
-                if (_use_heap) {
+                if (use_heap()) {
                     delete[] _heap._data;
                 }
-                _heap._capacity = new_size;
-                _heap._size = new_size;
-                _heap._data = new char[new_size + 1];
-                std::memcpy(_heap._data, other.data(), new_size + 1);
-                _use_heap = true;
+                auto new_data = new char[new_size + 1];
+                std::memcpy(new_data, other.data(), new_size + 1);
+                set_heap_data(new_size, new_size, new_data);
             }
             else {
-                if (_use_heap) {
+                if (use_heap()) {
                     _heap._size = new_size;
                     std::memcpy(_heap._data, other.data(), new_size + 1);
                 }
                 else {
-                    _small._size = (char)new_size;
+                    _small.set_size_and_reset_heap_flag(new_size);
                     std::memcpy(_small._buffer, other.data(), new_size + 1);
                 }
             }
             return *this;
         }
         string& operator=(string&& other) noexcept {
-            if (this->_use_heap) {
+            if (this->use_heap()) {
                 delete[] _heap._data;
             }
 
-            if (other._use_heap) {
-                this->_heap = other._heap;
-                this->_use_heap = true;
-
-                other._small._size = 0;
-                other._small._buffer[0] = 0;
-                other._use_heap = false;
+            if (other.use_heap()) {
+                set_heap_data(other._heap);
+                other.clear_small_data();
             }
             else {
-                this->_small = other._small;
-                this->_use_heap = false;
+                set_small_data(other._small);
             }
 
             return *this;
         }
 
         ~string() noexcept {
-            if (_use_heap) {
+            if (use_heap()) {
                 delete[] _heap._data;
             }
         }
 
         // useful and interesting
         void swap(string& other) noexcept {
-            if (this->_use_heap && other._use_heap) {
+            if (this->use_heap() && other.use_heap()) {
                 std::swap(this->_heap, other._heap);
             }
-            else if (!this->_use_heap && !other._use_heap) {
+            else if (!this->use_heap() && !other.use_heap()) {
                 std::swap(this->_small, other._small);
             }
-            else if (this->_use_heap && !other._use_heap) {
+            else if (this->use_heap() && !other.use_heap()) {
                 auto tmp_heap = this->_heap;
-
-                this->_small = other._small;
-                this->_use_heap = false;
-
-                other._heap = tmp_heap;
-                other._use_heap = true;
+                set_small_data(other._small);
+                other.set_heap_data(tmp_heap);
             }
-            else if (!this->_use_heap && other._use_heap) {
+            else if (!this->use_heap() && other.use_heap()) {
                 other.swap(*this);
             }
         }
@@ -200,22 +223,19 @@ namespace sso2 {
                 std::memcpy(new_data, data, index);
                 std::memset(new_data + index, ch, count);
                 std::memcpy(new_data + size, data + index, size + 1 - index);
-                if (_use_heap) {
+                if (use_heap()) {
                     delete data;
                 }
-                _heap._data = new_data;
-                _heap._size = size + count;
-                _heap._capacity = new_capacity;
-                _use_heap = true;
+                set_heap_data(size + count, new_capacity, new_data);
             }
             else if (count > 0) {
                 std::memmove(data + index + count, data + index, size + 1 - index);
                 std::memset(data + index, ch, count);
-                if (_use_heap) {
+                if (use_heap()) {
                     _heap._size = size + count;
                 }
                 else {
-                    _small._size = char(size + count);
+                    _small.set_size_and_reset_heap_flag(size + count);
                 }
             }
         }
@@ -230,13 +250,10 @@ namespace sso2 {
                 std::memcpy(new_data + index, str, count);
                 std::memcpy(new_data + index + count, data + index, size - index);
                 new_data[size + count] = 0;
-                if (_use_heap) {
+                if (use_heap()) {
                     delete data;
                 }
-                _heap._data = new_data;
-                _heap._size = size + count;
-                _heap._capacity = new_capacity;
-                _use_heap = true;
+                set_heap_data(size + count, new_capacity, new_data);
             }
             else {
                 std::memmove(data + index + count, data + index, size + 1 - index);
@@ -256,11 +273,11 @@ namespace sso2 {
                     }
                 }
                 std::memcpy(data + index, str, count);
-                if (_use_heap) {
+                if (use_heap()) {
                     _heap._size = size + count;
                 }
                 else {
-                    _small._size = char(size + count);
+                    _small.set_size_and_reset_heap_flag(size + count);
                 }
             }
         }
@@ -271,7 +288,7 @@ namespace sso2 {
         }
 
         size_t size() const noexcept {
-            return _use_heap ? _heap._size : _small._size;
+            return use_heap() ? _heap._size : _small.size();
         }
 
         void resize(size_t new_size, char ch = 0) {
@@ -279,28 +296,25 @@ namespace sso2 {
             if (capacity() < new_size) {
                 auto new_data = new char[new_size + 1];
                 std::memcpy(new_data, data(), old_size);
-                if (_use_heap) {
+                if (use_heap()) {
                     delete _heap._data;
                 }
-                _use_heap = true;
-                _heap._data = new_data;
                 std::memset(new_data + old_size, ch, new_size - old_size);
                 new_data[new_size] = 0;
-                _heap._size = new_size;
-                _heap._capacity = new_size;
+                set_heap_data(new_size, new_size, new_data);
             }
             else if (new_size < old_size) {
-                if (_use_heap) {
+                if (use_heap()) {
                     _heap._data[new_size] = 0;
                     _heap._size = new_size;
                 }
                 else {
                     _small._buffer[new_size] = 0;
-                    _small._size = (char)new_size;
+                    _small.set_size_and_reset_heap_flag(new_size);
                 }
             }
             else if (new_size > old_size) {
-                if (_use_heap) {
+                if (use_heap()) {
                     std::memset(_heap._data + old_size, ch, new_size - old_size);
                     _heap._data[new_size] = 0;
                     _heap._size = new_size;
@@ -308,13 +322,13 @@ namespace sso2 {
                 else {
                     std::memset(_small._buffer + old_size, ch, new_size - old_size);
                     _small._buffer[new_size] = 0;
-                    _small._size = (char)new_size;
+                    _small.set_size_and_reset_heap_flag(new_size);
                 }
             }
         }
 
         size_t capacity() const noexcept {
-            return _use_heap ? _heap._capacity : SSO_CAPACITY;
+            return use_heap() ? _heap.capacity() : SSO_CAPACITY;
         }
 
         void reserve(size_t new_capacity) {
@@ -323,18 +337,15 @@ namespace sso2 {
                 auto new_data = new char[new_capacity + 1];
                 std::memcpy(new_data, data(), size);
                 new_data[size] = 0;
-                if (_use_heap) {
+                if (use_heap()) {
                     delete _heap._data;
                 }
-                _heap._size = size;
-                _heap._data = new_data;
-                _heap._capacity = new_capacity;
-                _use_heap = true;
+                set_heap_data(size, new_capacity, new_data);
             }
         }
     };
 
     static_assert(
-        sizeof(string) == (sizeof(small_string_data) + sizeof(void*)),
-        "sizeof(string) != (sizeof(small_string_data) + sizeof(void*))");
+        sizeof(string) == sizeof(small_string_data),
+        "sizeof(string) != sizeof(small_string_data)");
 }
