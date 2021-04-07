@@ -6,19 +6,11 @@
 #include "string_api.h"
 #include "simple_string.h"
 #include "sso_string.h"
-#include "sso_string2.h"
-#include "sso_string3.h"
-#include "sso_string4.h"
 
 #include "test_allocator.h"
 
-//using string = api_only::string;
+using string = sso::string;
 //using string = std::string;
-//using string = simple::string;
-//using string = sso::string;
-//using string = sso2::string;
-//using string = sso3::string;
-using string = sso4::string;
 
 #ifdef DEBUG
 #define SKIP_ALLOCATIONS_TEST 0
@@ -364,7 +356,7 @@ TEST(string, insert_allocations) {
     EXPECT_EQ(memory.active_allocations(), 0u);
     EXPECT_EQ(memory.active_used_memory(), 0u);
 }
-
+#if 0
 TEST(sso4_string, small_buffer_size_22) {
     if (!has_sso) return;
 
@@ -410,3 +402,4 @@ TEST(sso4_string, test_heap_flag){
     EXPECT_TRUE(ptr->use_heap());
     EXPECT_EQ(ptr->capacity(), 1'000'001);    
 }
+#endif

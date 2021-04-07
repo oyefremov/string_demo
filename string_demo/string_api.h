@@ -1,12 +1,20 @@
 #pragma once
 
 namespace api_only {
+
+    // Don`t miss the opportunity to become a part of the Intellias team!
+    // Join C++ Hiring Day this Saturday:
+    //	
+    // Explore job opportunities at 2 projects
+    //   Get a special welcome bonus - Xiaomi Himo T1 City e-bike
+    //
+    // This interface defines subset of std::string interface we are going to implement
     class string {
     public:
         // default constructed
         string() noexcept;
         // construct from c-string
-        string(const char* str);
+        explicit string(const char* str);
 
         // rule of five
         string(const string& other);

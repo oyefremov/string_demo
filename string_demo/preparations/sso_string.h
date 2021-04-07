@@ -3,23 +3,6 @@
 #include <cstring>
 #include <utility>
 
-
-using const_string = std::shared_ptr<const std::string>;
-using mutable_string = std::string;
-
-const_streing make_const(mutable_string&& str){
-    return make_shared(std::move(str));
-}
-
-mutable_string make_mutable(const_string&& str){
-    if (str.unique()){
-        auto str = const_cast<std::string>(*str);
-        return str;
-    }else{
-        return *str;
-    }
-}
-
 namespace sso {
     class string {
 
@@ -199,9 +182,6 @@ namespace sso {
                 _size += count;
             }
             else {
-                // prefix__sufix
-                //    ^^^^^^^
-                // prefi^^^^^^^x__sufix
                 std::memmove(_data + index + count, _data + index, _size + 1 - index);
 
                 if (str + count >= _data + index && str + count <= _data + _size) {

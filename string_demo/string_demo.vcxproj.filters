@@ -21,9 +21,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="string_demo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="string_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -38,9 +35,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="string1.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="test_allocator.h">
       <Filter>test_allocator</Filter>
     </ClInclude>
@@ -49,18 +43,6 @@
     </ClInclude>
     <ClInclude Include="simple_string.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sso_string.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sso_string2.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sso_string3.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sso_string4.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
