@@ -166,6 +166,7 @@
     <ClInclude Include="sso_string.h" />
     <ClInclude Include="sso_string2.h" />
     <ClInclude Include="sso_string3.h" />
+    <ClInclude Include="sso_string4.h" />
     <ClInclude Include="string1.h" />
     <ClInclude Include="string_api.h" />
     <ClInclude Include="test_allocator.h" />

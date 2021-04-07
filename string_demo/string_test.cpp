@@ -8,6 +8,7 @@
 #include "sso_string.h"
 #include "sso_string2.h"
 #include "sso_string3.h"
+#include "sso_string4.h"
 
 #include "test_allocator.h"
 
@@ -16,7 +17,8 @@
 //using string = simple::string;
 //using string = sso::string;
 //using string = sso2::string;
-using string = sso3::string;
+//using string = sso3::string;
+using string = sso4::string;
 
 #ifdef DEBUG
 #define SKIP_ALLOCATIONS_TEST 0
@@ -363,6 +365,24 @@ TEST(string, insert_allocations) {
     EXPECT_EQ(memory.active_used_memory(), 0u);
 }
 
+TEST(sso4_string, small_buffer_size_22) {
+    if (!has_sso) return;
+
+    sso4::string str22("1234567890123456789012");
+    EXPECT_EQ(str22.size(), 22);
+    EXPECT_EQ(str22.capacity(), string().capacity());
+    EXPECT_STREQ(str22.c_str(), "1234567890123456789012");
+}
+
+TEST(sso4_string, small_buffer_size_23) {
+    if (!has_sso) return;
+
+    sso4::string str23("12345678901234567890123");
+    EXPECT_EQ(str23.size(), 23);
+    EXPECT_EQ(str23.capacity(), string().capacity());
+    EXPECT_STREQ(str23.c_str(), "12345678901234567890123");
+}
+
 TEST(sso3_string, test_heap_flag){
     sso3::small_string_data data;
     auto ptr = reinterpret_cast<sso3::heap_string_data*>(&data);
@@ -375,5 +395,18 @@ TEST(sso3_string, test_heap_flag){
     EXPECT_TRUE(data.use_heap());
     EXPECT_TRUE(ptr->use_heap());
     EXPECT_EQ(ptr->capacity(), 1'000'000);    
+}
 
+TEST(sso4_string, test_heap_flag){
+    sso4::small_string_data data;
+    auto ptr = reinterpret_cast<sso4::heap_string_data*>(&data);
+    
+    data.set_size_and_reset_heap_flag(7);
+    EXPECT_FALSE(data.use_heap());
+    EXPECT_FALSE(ptr->use_heap());
+    EXPECT_EQ(data.size(), 7);    
+    ptr->set_capacity_and_heap_flag(1'000'001);
+    EXPECT_TRUE(data.use_heap());
+    EXPECT_TRUE(ptr->use_heap());
+    EXPECT_EQ(ptr->capacity(), 1'000'001);    
 }

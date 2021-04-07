@@ -2,24 +2,23 @@
 
 #include <cstring>
 #include <utility>
+#include <cassert>
 
-namespace sso3 {
-
-    const size_t USE_HEAP_BIT = (size_t)1 << (sizeof(size_t) * 8 - 1);
-    const size_t CAPACITY_MASK = ~USE_HEAP_BIT;
+namespace sso4 {
 
     struct heap_string_data {
+        size_t _capacity_and_heap_flag;
         char* _data;
         size_t _size;
-        size_t _capacity_and_heap_flag;
         size_t capacity() const {
-            return _capacity_and_heap_flag & CAPACITY_MASK;
+            return _capacity_and_heap_flag;
         }
         bool use_heap() const {
-            return _capacity_and_heap_flag & USE_HEAP_BIT;
+            return _capacity_and_heap_flag & 1;
         }
         void set_capacity_and_heap_flag(size_t capacity) {
-            _capacity_and_heap_flag = capacity | USE_HEAP_BIT;
+            assert(capacity & 1);
+            _capacity_and_heap_flag = capacity;
         }
     };
 
@@ -35,17 +34,17 @@ namespace sso3 {
     static_assert(SSO_CAPACITY == 22, "SSO_CAPACITY != 22");
 
     struct small_string_data {
-        char _buffer[SSO_BUFFER_SIZE];
         char _size_and_heap_flag;
+        char _buffer[SSO_BUFFER_SIZE];
         size_t size() const {
-            return _size_and_heap_flag;
+            return SSO_CAPACITY - _size_and_heap_flag / 2;
         }
         bool use_heap() const {
-            return _size_and_heap_flag & 128;
+            return _size_and_heap_flag & 1;
         }
         void set_size_and_reset_heap_flag(size_t size) {
             assert(size <= SSO_CAPACITY);
-            _size_and_heap_flag = (char)size;
+            _size_and_heap_flag = (char)((SSO_CAPACITY - size) * 2);
         }
     };
 
@@ -56,6 +55,7 @@ namespace sso3 {
             small_string_data _small;
             heap_string_data _heap;
         };
+        
         bool use_heap() const {
             return _small.use_heap();
         }
@@ -94,6 +94,10 @@ namespace sso3 {
             return res - 1;
         }
 
+        size_t estimate_capacity(size_t required_size) const {
+            return required_size | 1;
+        }
+
         char* data() noexcept {
             return use_heap() ? _heap._data : _small._buffer;
         }
@@ -112,9 +116,10 @@ namespace sso3 {
         string(const char* str) {
             auto new_size = std::strlen(str);
             if (new_size > SSO_CAPACITY) {
-                auto new_data = new char[new_size + 1];
+                auto new_capacity = estimate_capacity(new_size);
+                auto new_data = new char[new_capacity + 1];
                 std::memcpy(new_data, str, new_size + 1);
-                set_heap_data(new_size, new_size, new_data);
+                set_heap_data(new_size, new_capacity, new_data);
             }
             else {
                 set_small_data(new_size, str);
@@ -124,9 +129,10 @@ namespace sso3 {
         string(const string& other) {
             auto new_size = other.size();
             if (new_size > SSO_CAPACITY) {
-                auto new_data = new char[new_size + 1];
+                auto new_capacity = estimate_capacity(new_size);
+                auto new_data = new char[new_capacity + 1];
                 std::memcpy(new_data, other.data(), new_size + 1);
-                set_heap_data(new_size, new_size, new_data);
+                set_heap_data(new_size, new_capacity, new_data);
             }
             else {
                 set_small_data(new_size, other.data());
@@ -146,12 +152,13 @@ namespace sso3 {
         string& operator=(const string& other) {
             auto new_size = other.size();
             if (new_size > capacity()) {
+                auto new_capacity = estimate_capacity(new_size);
+                auto new_data = new char[new_capacity + 1];
+                std::memcpy(new_data, other.data(), new_size + 1);
                 if (use_heap()) {
                     delete[] _heap._data;
                 }
-                auto new_data = new char[new_size + 1];
-                std::memcpy(new_data, other.data(), new_size + 1);
-                set_heap_data(new_size, new_size, new_data);
+                set_heap_data(new_size, new_capacity, new_data);
             }
             else {
                 if (use_heap()) {
@@ -294,14 +301,15 @@ namespace sso3 {
         void resize(size_t new_size, char ch = 0) {
             auto old_size = size();
             if (capacity() < new_size) {
-                auto new_data = new char[new_size + 1];
+                auto new_capacity = calc_capacity(new_size);
+                auto new_data = new char[new_capacity + 1];
                 std::memcpy(new_data, data(), old_size);
+                std::memset(new_data + old_size, ch, new_size - old_size);
+                new_data[new_size] = 0;
                 if (use_heap()) {
                     delete _heap._data;
                 }
-                std::memset(new_data + old_size, ch, new_size - old_size);
-                new_data[new_size] = 0;
-                set_heap_data(new_size, new_size, new_data);
+                set_heap_data(new_size, new_capacity, new_data);
             }
             else if (new_size < old_size) {
                 if (use_heap()) {
